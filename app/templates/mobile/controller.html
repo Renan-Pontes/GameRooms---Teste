@@ -1,0 +1,556 @@
+{% extends "base.html" %}
+
+{% block title %}Sala {{ room.code }} - Controle - Jogo na TV{% endblock %}
+
+{% block body_class %}mobile-controller{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="mobile-container">
+    <!-- Cabeçalho com informações da sala -->
+    <div class="room-info">
+        <h2>Sala: {{ room.code }}</h2>
+        <p>Jogador: {{ player_name }}</p>
+    </div>
+    
+    <!-- Código para TV -->
+    <div class="tv-code-section">
+        <p class="tv-instructions">Insira esse código na TV:</p>
+        <div class="tv-code">{{ room.code }}</div>
+        <p class="tv-url">URL da TV: {{ request.host_url }}tv/display/{{ room.code }}</p>
+    </div>
+
+    <!-- Área de Seleção de Jogo (apenas para o líder) -->
+    {% if is_host %}
+    <div id="game-selection" class="game-selection {% if room.game_state %}d-none{% endif %}">
+        <h3>Selecionar Jogo</h3>
+        <div class="games-list">
+            {% for game in available_games %}
+            <div class="game-card" data-game-id="{{ game.id }}">
+                <div class="game-icon">
+                    <i class="fas fa-gamepad"></i>
+                </div>
+                <div class="game-info">
+                    <h4>{{ game.name }}</h4>
+                    <p>{{ game.description }}</p>
+                    <p class="players-limit">{{ game.min_players }}-{{ game.max_players }} jogadores</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="start-game-container">
+            <button id="start-game-btn" class="btn btn-success btn-lg" disabled>
+                Iniciar Jogo
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Lista de Jogadores -->
+    <div class="players-section">
+        <h3>Jogadores</h3>
+        <div id="players-list" class="players-list">
+            <!-- Jogadores serão adicionados aqui via JavaScript -->
+        </div>
+    </div>
+
+    <!-- Controles de jogo (visíveis durante o jogo) -->
+    <div id="game-controls" class="game-controls {% if not room.game_state %}d-none{% endif %}">
+        <!-- Os controles específicos do jogo serão carregados aqui -->
+    </div>
+
+    <!-- Botão para sair da sala -->
+    <div class="exit-section">
+        <a href="{{ url_for('main.exit_room') }}" class="btn btn-danger">
+            <i class="fas fa-sign-out-alt me-2"></i>Sair da Sala
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Configuração do Socket.IO
+    const socket = io();
+    const roomCode = "{{ room.code }}";
+    const playerId = "{{ player_id }}";
+    const isHost = {{ 'true' if is_host else 'false' }};
+    let selectedGame = null;
+    let gameInProgress = {% if room.game_state %}true{% else %}false{% endif %};
+    
+    // Elementos DOM
+    const playersList = document.getElementById('players-list');
+    const gameControls = document.getElementById('game-controls');
+    
+    {% if is_host %}
+    const gameSelection = document.getElementById('game-selection');
+    const startGameBtn = document.getElementById('start-game-btn');
+    {% endif %}
+    
+    // Atualizar a lista de jogadores
+    function updatePlayersList(players, hostId) {
+        playersList.innerHTML = '';
+        
+        Object.entries(players).forEach(([id, name]) => {
+            const playerItem = document.createElement('div');
+            playerItem.className = 'player-item';
+            
+            if (id === hostId) {
+                playerItem.classList.add('host');
+            }
+            
+            if (id === playerId) {
+                playerItem.classList.add('current-player');
+            }
+            
+            playerItem.innerHTML = `
+                <div class="player-avatar">${name.charAt(0).toUpperCase()}</div>
+                <div class="player-name">${name}</div>
+                ${id === hostId ? '<div class="host-tag">Líder</div>' : ''}
+                ${id === playerId ? '<div class="you-tag">Você</div>' : ''}
+            `;
+            
+            playersList.appendChild(playerItem);
+        });
+    }
+    
+    // Carregar controles específicos do jogo
+    function loadGameControls(gameId) {
+        // Fazer uma requisição AJAX para buscar os controles específicos do jogo
+        fetch(`{{ url_for('mobile.game_controls', game_id='') }}${gameId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erro ao carregar controles do jogo');
+                }
+                return response.text();
+            })
+            .then(html => {
+                gameControls.innerHTML = html;
+                gameControls.classList.remove('d-none');
+                
+                // Inicializar eventos específicos do jogo
+                if (gameId === 'trivia') {
+                    initTriviaControls();
+                } else if (gameId === 'drawing') {
+                    initDrawingControls();
+                } else if (gameId === 'word_game') {
+                    initWordGameControls();
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                gameControls.innerHTML = `
+                    <div class="alert alert-danger">
+                        Erro ao carregar controles do jogo. Tente recarregar a página.
+                    </div>
+                `;
+            });
+    }
+    
+    // Inicializar controles para o jogo de Trivia
+    function initTriviaControls() {
+        // Adicionar event listeners para as opções
+        document.querySelectorAll('.trivia-option').forEach(option => {
+            option.addEventListener('click', function() {
+                const answerIndex = this.getAttribute('data-index');
+                
+                // Enviar a resposta para o servidor
+                socket.emit('game_action', {
+                    action: 'answer',
+                    answer_index: parseInt(answerIndex)
+                });
+                
+                // Desabilitar todas as opções após responder
+                document.querySelectorAll('.trivia-option').forEach(opt => {
+                    opt.classList.add('disabled');
+                    opt.disabled = true;
+                });
+                
+                // Destacar a opção selecionada
+                this.classList.add('selected');
+            });
+        });
+    }
+    
+    // Inicializar controles para o jogo de Desenho
+    function initDrawingControls() {
+        const canvas = document.getElementById('drawing-canvas');
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        let color = document.getElementById('color-picker').value;
+        let thickness = parseInt(document.getElementById('thickness-picker').value);
+        
+        // Ajustar o tamanho do canvas ao tamanho do contêiner
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientWidth * 0.75; // Proporção 4:3
+        }
+        
+        // Inicializar o canvas
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        
+        // Limpar o canvas
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Event listeners para desenho
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('touchstart', startDrawing);
+        
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('touchmove', draw);
+        
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('touchend', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+        
+        // Event listeners para controles de desenho
+        document.getElementById('color-picker').addEventListener('change', function() {
+            color = this.value;
+        });
+        
+        document.getElementById('thickness-picker').addEventListener('change', function() {
+            thickness = parseInt(this.value);
+        });
+        
+        document.getElementById('clear-btn').addEventListener('click', function() {
+            // Limpar o canvas localmente
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Enviar evento para limpar o canvas de todos
+            socket.emit('game_action', {
+                action: 'clear_canvas'
+            });
+        });
+        
+        // Função para iniciar o desenho
+        function startDrawing(e) {
+            isDrawing = true;
+            
+            // Obter coordenadas
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            
+            lastX = clientX - rect.left;
+            lastY = clientY - rect.top;
+            
+            // Desenhar um ponto
+            ctx.beginPath();
+            ctx.fillStyle = color;
+            ctx.arc(lastX, lastY, thickness / 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Enviar para o servidor
+            socket.emit('game_action', {
+                action: 'draw',
+                x: lastX,
+                y: lastY,
+                color: color,
+                thickness: thickness
+            });
+            
+            // Prevenir comportamento padrão
+            e.preventDefault();
+        }
+        
+        // Função para desenhar
+        function draw(e) {
+            if (!isDrawing) return;
+            
+            // Obter coordenadas
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+            
+            // Desenhar linha
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = thickness;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            
+            // Enviar para o servidor
+            socket.emit('game_action', {
+                action: 'draw',
+                x: x,
+                y: y,
+                lastX: lastX,
+                lastY: lastY,
+                color: color,
+                thickness: thickness
+            });
+            
+            // Atualizar coordenadas
+            lastX = x;
+            lastY = y;
+            
+            // Prevenir comportamento padrão
+            e.preventDefault();
+        }
+        
+        // Função para parar o desenho
+        function stopDrawing() {
+            isDrawing = false;
+        }
+        
+        // Inicializar o campo de adivinhação
+        const guessForm = document.getElementById('guess-form');
+        const guessInput = document.getElementById('guess-input');
+        
+        guessForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const guess = guessInput.value.trim();
+            if (guess) {
+                // Enviar adivinhação para o servidor
+                socket.emit('game_action', {
+                    action: 'guess',
+                    guess: guess
+                });
+                
+                // Limpar o campo
+                guessInput.value = '';
+            }
+        });
+    }
+    
+    // Inicializar controles para o jogo de Palavras
+    function initWordGameControls() {
+        // Implementar controles para o jogo de palavras
+        // ...
+    }
+    
+    // Socket.IO event listeners
+    socket.on('connect', function() {
+        console.log('Conectado ao servidor');
+        
+        // Entrar na sala
+        socket.emit('join_room', {
+            room_code: roomCode,
+            player_id: playerId,
+            player_name: "{{ player_name }}"
+        });
+        
+        // Inicializar a lista de jogadores
+        updatePlayersList({{ room.players|tojson }}, "{{ room.host_id }}");
+        
+        // Se o jogo já estiver em andamento, carregar os controles
+        if (gameInProgress) {
+            loadGameControls("{{ room.selected_game }}");
+        }
+    });
+    
+    socket.on('player_joined', function(data) {
+        console.log('Jogador entrou:', data.player_name);
+        updatePlayersList(data.players, data.host_id);
+    });
+    
+    socket.on('player_left', function(data) {
+        console.log('Jogador saiu');
+        updatePlayersList(data.players, data.new_host_id || "{{ room.host_id }}");
+    });
+    
+    socket.on('game_selected', function(data) {
+        console.log('Jogo selecionado:', data.game_id);
+        selectedGame = data.game_id;
+    });
+    
+    socket.on('game_started', function(data) {
+        console.log('Jogo iniciado:', data.game_id);
+        gameInProgress = true;
+        
+        // Esconder seleção de jogo (apenas para o host)
+        {% if is_host %}
+        gameSelection.classList.add('d-none');
+        {% endif %}
+        
+        // Carregar controles do jogo
+        loadGameControls(data.game_id);
+    });
+    
+    socket.on('new_question', function(data) {
+        console.log('Nova pergunta:', data.question);
+        
+        // Atualizar a interface para a nova pergunta
+        const triviaControls = document.getElementById('trivia-controls');
+        if (triviaControls) {
+            // Atualizar a pergunta
+            const questionText = triviaControls.querySelector('.question-text');
+            if (questionText) {
+                questionText.textContent = data.question;
+            }
+            
+            // Atualizar opções
+            const optionsContainer = triviaControls.querySelector('.options-container');
+            if (optionsContainer) {
+                optionsContainer.innerHTML = data.options.map((option, index) => `
+                    <button class="trivia-option btn btn-outline-primary" data-index="${index}">
+                        <span class="option-letter">${String.fromCharCode(65 + index)}</span>
+                        <span class="option-text">${option}</span>
+                    </button>
+                `).join('');
+                
+                // Reinicializar event listeners
+                initTriviaControls();
+            }
+            
+            // Atualizar informações da rodada
+            const roundInfo = triviaControls.querySelector('.round-info');
+            if (roundInfo) {
+                roundInfo.textContent = `Rodada ${data.round} de ${data.total_rounds}`;
+            }
+        }
+    });
+    
+    socket.on('round_results', function(data) {
+        console.log('Resultados da rodada:', data);
+        
+        // Mostrar resultados no trivia
+        const triviaControls = document.getElementById('trivia-controls');
+        if (triviaControls) {
+            const optionsButtons = triviaControls.querySelectorAll('.trivia-option');
+            const correctIndex = data.correct_index;
+            
+            // Destacar a resposta correta e as incorretas
+            optionsButtons.forEach((button, index) => {
+                if (index === correctIndex) {
+                    button.classList.add('correct');
+                } else if (data.answers[playerId] === index) {
+                    button.classList.add('wrong');
+                }
+            });
+            
+            // Mostrar mensagem de feedback
+            const triviaFeedback = triviaControls.querySelector('.trivia-feedback');
+            if (triviaFeedback) {
+                const isCorrect = data.answers[playerId] === correctIndex;
+                
+                triviaFeedback.innerHTML = isCorrect
+                    ? '<div class="alert alert-success">Parabéns! Você acertou!</div>'
+                    : '<div class="alert alert-danger">Ops! Você errou!</div>';
+                
+                triviaFeedback.classList.remove('d-none');
+            }
+        }
+    });
+    
+    socket.on('game_over', function(data) {
+        console.log('Fim do jogo:', data);
+        
+        // Mostrar tela de fim de jogo
+        gameControls.innerHTML = `
+            <div class="game-over">
+                <h3>Fim do Jogo!</h3>
+                
+                <div class="winners-section">
+                    <h4>${data.winners.length > 1 ? 'Vencedores:' : 'Vencedor:'}</h4>
+                    <div class="winners-list">
+                        ${data.winners.map(winner => `
+                            <div class="winner-item ${winner === playerId ? 'you' : ''}">
+                                ${winner === playerId ? 'Você venceu!' : '{{ room.players[winner] }}'}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <div class="final-scores">
+                    <h4>Pontuação Final:</h4>
+                    <div class="scores-list">
+                        ${Object.entries(data.final_scores)
+                            .sort(([, a], [, b]) => b - a)
+                            .map(([pid, score]) => `
+                                <div class="score-item ${pid === playerId ? 'you' : ''} ${data.winners.includes(pid) ? 'winner' : ''}">
+                                    <span class="player-name">
+                                        ${pid === playerId ? 'Você' : '{{ room.players[pid] }}'}
+                                    </span>
+                                    <span class="score">${score} pts</span>
+                                </div>
+                            `).join('')}
+                    </div>
+                </div>
+                
+                ${isHost ? `
+                    <div class="new-game-container mt-4">
+                        <button id="end-game-btn" class="btn btn-danger">
+                            <i class="fas fa-stop-circle me-2"></i>Encerrar Jogo
+                        </button>
+                    </div>
+                ` : `
+                    <div class="waiting-message">
+                        <p>Aguardando o líder iniciar um novo jogo...</p>
+                    </div>
+                `}
+            </div>
+        `;
+        
+        // Adicionar event listener para o botão de encerrar jogo (apenas para o host)
+        if (isHost) {
+            document.getElementById('end-game-btn').addEventListener('click', function() {
+                socket.emit('end_game');
+            });
+        }
+    });
+    
+    socket.on('game_ended', function() {
+        console.log('Jogo encerrado pelo líder');
+        gameInProgress = false;
+        
+        // Mostrar seleção de jogo (apenas para o host)
+        {% if is_host %}
+        gameSelection.classList.remove('d-none');
+        startGameBtn.disabled = true;
+        {% endif %}
+        
+        // Esconder controles de jogo
+        gameControls.classList.add('d-none');
+    });
+    
+    // Event listeners específicos para o host
+    {% if is_host %}
+    document.querySelectorAll('.game-card').forEach(card => {
+        card.addEventListener('click', function() {
+            // Remover seleção anterior
+            document.querySelectorAll('.game-card').forEach(c => c.classList.remove('selected'));
+            
+            // Adicionar seleção ao card atual
+            this.classList.add('selected');
+            
+            // Armazenar o jogo selecionado
+            selectedGame = this.getAttribute('data-game-id');
+            
+            // Habilitar botão de iniciar
+            startGameBtn.disabled = false;
+            
+            // Enviar seleção para o servidor
+            socket.emit('select_game', {
+                game_id: selectedGame
+            });
+        });
+    });
+    
+    startGameBtn.addEventListener('click', function() {
+        if (selectedGame) {
+            // Enviar evento para iniciar o jogo
+            socket.emit('start_game');
+        }
+    });
+    {% endif %}
+</script>
+{% endblock %}

@@ -1,0 +1,1 @@
+# Este arquivo permite que o diretório utils seja tratado como um pacote Python

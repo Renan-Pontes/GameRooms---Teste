@@ -1,0 +1,59 @@
+<div id="drawing-controls" class="drawing-controls">
+    <!-- Controles de desenho (visíveis apenas para o desenhista atual) -->
+    {% if player_id == room.game_state.current_drawer %}
+    <div class="drawing-tools">
+        <div class="word-to-draw">
+            <h3>Desenhe:</h3>
+            <div class="word">{{ room.game_state.word }}</div>
+        </div>
+        
+        <div class="drawing-canvas-container">
+            <canvas id="drawing-canvas"></canvas>
+        </div>
+        
+        <div class="tools-container">
+            <div class="color-tools">
+                <label for="color-picker">Cor:</label>
+                <input type="color" id="color-picker" value="#000000">
+            </div>
+            
+            <div class="thickness-tools">
+                <label for="thickness-picker">Espessura:</label>
+                <input type="range" id="thickness-picker" min="1" max="20" value="5">
+            </div>
+            
+            <div class="clear-tools">
+                <button id="clear-btn" class="btn btn-warning">
+                    <i class="fas fa-eraser me-2"></i>Limpar
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Controles de adivinhação (visíveis para quem não está desenhando) -->
+    {% else %}
+    <div class="guessing-tools">
+        <h3>Adivinhe o desenho!</h3>
+        
+        <div class="current-drawer">
+            Desenhista: <strong>{{ room.players[room.game_state.current_drawer] }}</strong>
+        </div>
+        
+        <form id="guess-form" class="guess-form">
+            <div class="input-group mb-3">
+                <input type="text" id="guess-input" class="form-control" placeholder="Digite sua resposta..." autocomplete="off" required>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </form>
+        
+        <div class="guesses-container">
+            <h4>Palpites Anteriores:</h4>
+            <div id="guesses-list" class="guesses-list">
+                <!-- Palpites serão adicionados aqui via JavaScript -->
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>

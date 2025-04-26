@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Jogo na TV - Jogue games na TV com seus amigos!{% endblock %}
+
+{% block body_class %}home-page{% endblock %}
+
+{% block content %}
+<div class="row align-items-center hero-section">
+    <div class="col-lg-6">
+        <h1 class="display-4 mb-4">Transforme sua TV em um console de jogos!</h1>
+        <p class="lead mb-4">
+            Crie uma sala de jogos, compartilhe o código com seus amigos e use seus celulares como controles para jogar juntos na TV.
+        </p>
+        <div class="d-grid gap-2 d-md-flex justify-content-md-start mb-4">
+            <a href="{{ url_for('main.create_room') }}" class="btn btn-primary btn-lg px-4 me-md-2">
+                <i class="fas fa-plus-circle me-2"></i>Criar Sala
+            </a>
+            <a href="{{ url_for('main.join_room') }}" class="btn btn-outline-secondary btn-lg px-4">
+                <i class="fas fa-sign-in-alt me-2"></i>Entrar em Sala
+            </a>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <img src="{{ url_for('static', filename='img/game-illustration.svg') }}" alt="Ilustração de jogos" class="img-fluid">
+    </div>
+</div>
+
+<div class="row mt-5 text-center features-section">
+    <h2 class="mb-4">Como Funciona</h2>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <i class="fas fa-tv fa-3x mb-3 text-primary"></i>
+                <h3 class="card-title">1. Abra na TV</h3>
+                <p class="card-text">Acesse o site em uma TV ou computador conectado a uma tela grande.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <i class="fas fa-users fa-3x mb-3 text-primary"></i>
+                <h3 class="card-title">2. Conecte Amigos</h3>
+                <p class="card-text">Crie uma sala e compartilhe o código para que seus amigos possam se juntar usando seus celulares.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <i class="fas fa-gamepad fa-3x mb-3 text-primary"></i>
+                <h3 class="card-title">3. Divirta-se!</h3>
+                <p class="card-text">Escolha um jogo e comece a jogar! Seu celular se torna o controle, e a TV mostra a ação.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5 games-section">
+    <h2 class="text-center mb-4">Jogos Disponíveis</h2>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card game-card">
+            <img src="{{ url_for('static', filename='img/game-trivia.jpg') }}" class="card-img-top" alt="Quiz de Conhecimentos">
+            <div class="card-body">
+                <h3 class="card-title">Quiz de Conhecimentos</h3>
+                <p class="card-text">Teste seus conhecimentos com perguntas de diversas categorias.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card game-card">
+            <img src="{{ url_for('static', filename='img/game-words.jpg') }}" class="card-img-top" alt="Jogo de Palavras">
+            <div class="card-body">
+                <h3 class="card-title">Jogo de Palavras</h3>
+                <p class="card-text">Adivinhe a palavra com base nas dicas dos outros jogadores.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card game-card">
+            <img src="{{ url_for('static', filename='img/game-drawing.jpg') }}" class="card-img-top" alt="Desenho & Adivinhação">
+            <div class="card-body">
+                <h3 class="card-title">Desenho & Adivinhação</h3>
+                <p class="card-text">Um jogador desenha, os outros tentam adivinhar o que é.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

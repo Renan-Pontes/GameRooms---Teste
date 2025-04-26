@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Como Jogar - Jogo na TV{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h2 class="card-title mb-0">
+                    <i class="fas fa-question-circle me-2"></i>Como Jogar
+                </h2>
+            </div>
+            <div class="card-body">
+                <div class="how-to-section">
+                    <h3>Configuração Inicial</h3>
+                    <ol>
+                        <li>
+                            <strong>Prepare a TV ou tela grande:</strong> Acesse o site do Jogo na TV em uma TV inteligente, computador conectado a uma TV ou qualquer dispositivo com tela grande.
+                        </li>
+                        <li>
+                            <strong>Crie uma sala:</strong> No seu celular, acesse o site e clique em "Criar Sala". Insira seu nome e você receberá um código de sala.
+                        </li>
+                        <li>
+                            <strong>Exiba o jogo na TV:</strong> Na TV, acesse "{{ request.host_url }}tv/display/CÓDIGO" substituindo "CÓDIGO" pelo código da sua sala.
+                        </li>
+                        <li>
+                            <strong>Convide amigos:</strong> Compartilhe o código da sala ou use o QR code exibido na TV para que seus amigos possam entrar usando seus celulares.
+                        </li>
+                    </ol>
+                </div>
+                
+                <hr>
+                
+                <div class="how-to-section">
+                    <h3>Selecionando e Jogando</h3>
+                    <ol>
+                        <li>
+                            <strong>Escolha um jogo:</strong> O líder (criador da sala) seleciona um jogo no seu celular entre as opções disponíveis.
+                        </li>
+                        <li>
+                            <strong>Inicie o jogo:</strong> O líder pressiona "Iniciar Jogo" quando todos estiverem prontos.
+                        </li>
+                        <li>
+                            <strong>Use seu celular como controle:</strong> Cada jogador verá controles específicos para o jogo em seu celular.
+                        </li>
+                        <li>
+                            <strong>A TV mostra o jogo:</strong> A TV exibe o estado atual do jogo, perguntas, desenhos ou outras informações para todos verem.
+                        </li>
+                    </ol>
+                </div>
+                
+                <hr>
+                
+                <div class="how-to-section">
+                    <h3>Jogos Disponíveis</h3>
+                    
+                    <div class="game-instructions">
+                        <h4>Quiz de Conhecimentos</h4>
+                        <p>
+                            Um jogo de perguntas e respostas onde cada jogador tenta responder corretamente para acumular pontos.
+                        </p>
+                        <ul>
+                            <li>Cada jogador vê as mesmas perguntas e opções em seu celular.</li>
+                            <li>Selecione a opção que você acredita ser correta.</li>
+                            <li>Pontos são concedidos para respostas corretas.</li>
+                            <li>O jogador com mais pontos no final vence!</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="game-instructions">
+                        <h4>Desenho & Adivinhação</h4>
+                        <p>
+                            Um jogador desenha uma palavra secreta, enquanto os outros tentam adivinhar o que é.
+                        </p>
+                        <ul>
+                            <li>O desenhista vê uma palavra secreta e usa controles de desenho no celular.</li>
+                            <li>Os outros jogadores veem o desenho na TV e tentam adivinhar a palavra no celular.</li>
+                            <li>Pontos são concedidos para quem adivinhar corretamente.</li>
+                            <li>Os jogadores se revezam como desenhistas.</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="game-instructions">
+                        <h4>Jogo de Palavras</h4>
+                        <p>
+                            Descubra a palavra secreta com base nas dicas fornecidas.
+                        </p>
+                        <ul>
+                            <li>A TV mostra uma palavra oculta (representada por traços).</li>
+                            <li>Cada jogador pode tentar adivinhar letras ou a palavra completa.</li>
+                            <li>Adivinhações incorretas resultam em penalidades.</li>
+                            <li>Pontos são concedidos com base na rapidez e precisão.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-4 text-center">
+            <a href="{{ url_for('main.create_room') }}" class="btn btn-primary btn-lg">
+                <i class="fas fa-gamepad me-2"></i>Estou Pronto para Jogar!
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

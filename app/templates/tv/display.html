@@ -1,0 +1,546 @@
+{% extends "base.html" %}
+
+{% block title %}Sala {{ room.code }} - TV - Jogo na TV{% endblock %}
+
+{% block body_class %}tv-display{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tv.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="tv-container">
+    <!-- Cabeçalho com informações da sala -->
+    <div class="room-info">
+        <h1 class="room-code">Sala: {{ room.code }}</h1>
+        <div class="qr-link">
+            <a href="{{ url_for('tv.qr_code', code=room.code) }}" class="btn btn-outline-light btn-sm">
+                <i class="fas fa-qrcode me-2"></i>Mostrar QR Code
+            </a>
+        </div>
+    </div>
+
+    <!-- Tela de espera (visível quando não há jogo em andamento) -->
+    <div id="waiting-screen" class="{% if room.game_state %}d-none{% endif %}">
+        <div class="waiting-content text-center">
+            <h2>Esperando jogadores e seleção de jogo...</h2>
+            <p class="lead">Use o código <strong>{{ room.code }}</strong> para entrar na sala</p>
+            
+            <div class="instructions">
+                <p>
+                    <i class="fas fa-mobile-alt fa-2x me-3"></i>
+                    Entre pelo celular em: <strong>{{ request.host_url }}join</strong>
+                </p>
+            </div>
+            
+            <div class="players-grid" id="players-grid">
+                <!-- Jogadores serão adicionados aqui via JavaScript -->
+            </div>
+            
+            <div id="game-selection-status" class="mt-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p>Aguardando o líder selecionar um jogo...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tela de jogo (visível quando há jogo em andamento) -->
+    <div id="game-screen" class="{% if not room.game_state %}d-none{% endif %}">
+        <!-- O conteúdo específico do jogo será inserido aqui via JavaScript -->
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Configuração do Socket.IO
+    const socket = io();
+    const roomCode = "{{ room.code }}";
+    let gameInProgress = {% if room.game_state %}true{% else %}false{% endif %};
+    let currentGame = "{{ room.selected_game or '' }}";
+    
+    // Elementos DOM
+    const waitingScreen = document.getElementById('waiting-screen');
+    const gameScreen = document.getElementById('game-screen');
+    const playersGrid = document.getElementById('players-grid');
+    const gameSelectionStatus = document.getElementById('game-selection-status');
+    
+    // Atualizar a grade de jogadores
+    function updatePlayersGrid(players) {
+        playersGrid.innerHTML = '';
+        
+        Object.entries(players).forEach(([id, name]) => {
+            const playerCard = document.createElement('div');
+            playerCard.className = 'player-card';
+            playerCard.setAttribute('data-player-id', id);
+            
+            const isHost = id === "{{ room.host_id }}";
+            if (isHost) {
+                playerCard.classList.add('host');
+            }
+            
+            playerCard.innerHTML = `
+                <div class="avatar">${name.charAt(0).toUpperCase()}</div>
+                <div class="player-name">${name}</div>
+                ${isHost ? '<div class="host-badge">Líder</div>' : ''}
+            `;
+            
+            playersGrid.appendChild(playerCard);
+        });
+    }
+    
+    // Inicializar a interface do jogo
+    function initGameDisplay(gameId, gameState) {
+        waitingScreen.classList.add('d-none');
+        gameScreen.classList.remove('d-none');
+        currentGame = gameId;
+        
+        // Limpar a tela de jogo
+        gameScreen.innerHTML = '';
+        
+        // Carregar a interface específica do jogo
+        if (gameId === 'trivia') {
+            initTriviaGame(gameState);
+        } else if (gameId === 'drawing') {
+            initDrawingGame(gameState);
+        } else if (gameId === 'word_game') {
+            initWordGame(gameState);
+        }
+    }
+    
+    // Inicializar o jogo de Trivia
+    function initTriviaGame(gameState) {
+        gameScreen.innerHTML = `
+            <div class="trivia-game">
+                <div class="round-info">
+                    <span class="current-round">Rodada ${gameState.current_round + 1}</span>
+                    <span class="total-rounds">de ${gameState.total_rounds}</span>
+                </div>
+                
+                <div class="question-container">
+                    <h2 class="question-text">${gameState.current_question.text}</h2>
+                </div>
+                
+                <div class="options-container">
+                    ${gameState.current_question.options.map((option, index) => `
+                        <div class="option" data-index="${index}">
+                            <span class="option-letter">${String.fromCharCode(65 + index)}</span>
+                            <span class="option-text">${option}</span>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <div class="players-answers">
+                    <h3>Jogadores:</h3>
+                    <div class="answers-grid" id="answers-grid">
+                        ${Object.entries(gameState.players).map(([playerId, playerName]) => `
+                            <div class="player-answer" data-player-id="${playerId}">
+                                <span class="player-name">${playerName}</span>
+                                <span class="answer-status">
+                                    ${gameState.answers && playerId in gameState.answers
+                                        ? '<i class="fas fa-check-circle text-success"></i>'
+                                        : '<i class="fas fa-clock text-warning"></i>'}
+                                </span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Inicializar o jogo de Desenho
+    function initDrawingGame(gameState) {
+        gameScreen.innerHTML = `
+            <div class="drawing-game">
+                <div class="round-info">
+                    <span class="current-round">Rodada ${gameState.current_round + 1}</span>
+                    <span class="total-rounds">de ${gameState.total_rounds}</span>
+                </div>
+                
+                <div class="current-drawer">
+                    Desenhista: <strong>${gameState.players[gameState.current_drawer]}</strong>
+                </div>
+                
+                <div class="canvas-container">
+                    <canvas id="drawing-canvas" width="800" height="600"></canvas>
+                </div>
+                
+                <div class="guesses-container">
+                    <h3>Palpites:</h3>
+                    <div class="guesses-list" id="guesses-list"></div>
+                </div>
+            </div>
+        `;
+        
+        // Inicializar o canvas
+        initDrawingCanvas();
+    }
+    
+    // Inicializar o canvas para o jogo de Desenho
+    function initDrawingCanvas() {
+        const canvas = document.getElementById('drawing-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Limpar o canvas
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    
+    // Inicializar o jogo de Palavras
+    function initWordGame(gameState) {
+        gameScreen.innerHTML = `
+            <div class="word-game">
+                <div class="round-info">
+                    <span class="current-round">Rodada ${gameState.current_round + 1}</span>
+                    <span class="total-rounds">de ${gameState.total_rounds}</span>
+                </div>
+                
+                <div class="word-display">
+                    ${gameState.display_word.split('').map(char => 
+                        char === '_' 
+                            ? '<span class="letter-blank">_</span>' 
+                            : `<span class="letter">${char}</span>`
+                    ).join('')}
+                </div>
+                
+                <div class="clue-container">
+                    <h3>Dica:</h3>
+                    <p class="clue-text">${gameState.clue || 'Sem dica'}</p>
+                </div>
+                
+                <div class="players-container">
+                    <h3>Jogadores:</h3>
+                    <div class="players-scores">
+                        ${Object.entries(gameState.scores).map(([playerId, score]) => `
+                            <div class="player-score">
+                                <span class="player-name">${gameState.players[playerId]}</span>
+                                <span class="score">${score} pts</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Mostrar os resultados da rodada (Trivia)
+    function showRoundResults(results) {
+        const options = document.querySelectorAll('.option');
+        const correctIndex = results.correct_index;
+        
+        // Destacar a resposta correta
+        options[correctIndex].classList.add('correct');
+        
+        // Destacar as respostas dos jogadores
+        Object.entries(results.answers).forEach(([playerId, answerIndex]) => {
+            const playerElement = document.querySelector(`.player-answer[data-player-id="${playerId}"]`);
+            
+            if (playerElement) {
+                const isCorrect = answerIndex === correctIndex;
+                
+                playerElement.querySelector('.answer-status').innerHTML = isCorrect
+                    ? '<i class="fas fa-check-circle text-success"></i>'
+                    : '<i class="fas fa-times-circle text-danger"></i>';
+                
+                playerElement.classList.add(isCorrect ? 'correct' : 'wrong');
+            }
+        });
+        
+        // Atualizar pontuações
+        updateScores(results.scores);
+    }
+    
+    // Atualizar pontuações
+    function updateScores(scores) {
+        Object.entries(scores).forEach(([playerId, score]) => {
+            const playerCard = document.querySelector(`.player-card[data-player-id="${playerId}"]`);
+            
+            if (playerCard) {
+                let scoreElement = playerCard.querySelector('.player-score');
+                
+                if (!scoreElement) {
+                    scoreElement = document.createElement('div');
+                    scoreElement.className = 'player-score';
+                    playerCard.appendChild(scoreElement);
+                }
+                
+                scoreElement.textContent = `${score} pts`;
+            }
+        });
+    }
+    
+    // Processar adivinhação no jogo de Desenho
+    function processGuess(data) {
+        const guessesList = document.getElementById('guesses-list');
+        
+        if (guessesList) {
+            const guessElement = document.createElement('div');
+            guessElement.className = `guess ${data.correct ? 'correct' : ''}`;
+            guessElement.innerHTML = `
+                <span class="player-name">${data.player_name}:</span>
+                <span class="guess-text">${data.guess}</span>
+                ${data.correct 
+                    ? '<span class="correct-badge"><i class="fas fa-check-circle"></i> Correto!</span>' 
+                    : ''}
+            `;
+            
+            guessesList.appendChild(guessElement);
+            guessesList.scrollTop = guessesList.scrollHeight;
+            
+            if (data.correct) {
+                // Destacar que alguém acertou
+                document.querySelector('.canvas-container').classList.add('correct-guess');
+                
+                // Atualizar pontuações se disponíveis
+                if (data.scores) {
+                    updateScores(data.scores);
+                }
+            }
+        }
+    }
+    
+    // Atualizar o desenho no jogo de Desenho
+    function updateDrawing(data) {
+        const canvas = document.getElementById('drawing-canvas');
+        
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            
+            if (data.clear) {
+                // Limpar o canvas
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else if (data.x !== undefined && data.y !== undefined) {
+                // Desenhar linha ou ponto
+                ctx.strokeStyle = data.color || '#000000';
+                ctx.lineWidth = data.thickness || 2;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                if (data.lastX !== undefined && data.lastY !== undefined) {
+                    // Desenhar linha
+                    ctx.beginPath();
+                    ctx.moveTo(data.lastX, data.lastY);
+                    ctx.lineTo(data.x, data.y);
+                    ctx.stroke();
+                } else {
+                    // Desenhar ponto
+                    ctx.beginPath();
+                    ctx.arc(data.x, data.y, ctx.lineWidth / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+    }
+    
+    // Mostrar fim de jogo
+    function showGameOver(data) {
+        gameScreen.innerHTML = `
+            <div class="game-over">
+                <h2>Fim do Jogo!</h2>
+                
+                <div class="winners">
+                    <h3>${data.winners.length > 1 ? 'Vencedores:' : 'Vencedor:'}</h3>
+                    <div class="winners-list">
+                        ${data.winners.map(playerId => `
+                            <div class="winner">
+                                <div class="avatar">${room.players[playerId].charAt(0).toUpperCase()}</div>
+                                <div class="player-name">${room.players[playerId]}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <div class="final-scores">
+                    <h3>Pontuação Final:</h3>
+                    <div class="scores-list">
+                        ${Object.entries(data.final_scores)
+                            .sort(([, a], [, b]) => b - a)
+                            .map(([playerId, score]) => `
+                                <div class="score-item ${data.winners.includes(playerId) ? 'winner' : ''}">
+                                    <span class="player-name">${room.players[playerId]}</span>
+                                    <span class="score">${score} pts</span>
+                                </div>
+                            `).join('')}
+                    </div>
+                </div>
+                
+                <div class="waiting-message">
+                    <p>Aguardando o líder iniciar um novo jogo...</p>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Socket.IO event listeners
+    socket.on('connect', function() {
+        console.log('Conectado ao servidor');
+        
+        // Inicializar a lista de jogadores
+        updatePlayersGrid({{ room.players|tojson }});
+    });
+    
+    socket.on('player_joined', function(data) {
+        console.log('Jogador entrou:', data.player_name);
+        updatePlayersGrid(data.players);
+    });
+
+    socket.on('player_left', function(data) {
+        console.log('Jogador saiu');
+        updatePlayersGrid(data.players);
+        
+        // Se o host mudou, mostrar mensagem
+        if (data.host_changed && data.new_host_id) {
+            const newHostName = data.players[data.new_host_id];
+            gameSelectionStatus.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-crown me-2"></i>
+                    O líder saiu da sala. ${newHostName} agora é o novo líder.
+                </div>
+            `;
+        }
+    });
+    
+    socket.on('game_selected', function(data) {
+        console.log('Jogo selecionado:', data.game_id);
+        currentGame = data.game_id;
+        
+        // Atualizar status da seleção de jogo
+        gameSelectionStatus.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-gamepad me-2"></i>
+                Jogo selecionado: <strong>${data.game_info.name}</strong>
+            </div>
+            <p>Aguardando o líder iniciar o jogo...</p>
+        `;
+    });
+    
+    socket.on('game_started', function(data) {
+        console.log('Jogo iniciado:', data.game_id);
+        gameInProgress = true;
+        initGameDisplay(data.game_id, data);
+    });
+    
+    socket.on('new_question', function(data) {
+        console.log('Nova pergunta:', data.question);
+        
+        // Atualizar a pergunta no trivia
+        if (currentGame === 'trivia') {
+            const questionText = document.querySelector('.question-text');
+            const roundInfo = document.querySelector('.current-round');
+            const optionsContainer = document.querySelector('.options-container');
+            
+            if (questionText && optionsContainer) {
+                // Atualizar a pergunta
+                questionText.textContent = data.question;
+                
+                // Atualizar informações da rodada
+                if (roundInfo) {
+                    roundInfo.textContent = `Rodada ${data.round}`;
+                }
+                
+                // Atualizar opções
+                optionsContainer.innerHTML = data.options.map((option, index) => `
+                    <div class="option" data-index="${index}">
+                        <span class="option-letter">${String.fromCharCode(65 + index)}</span>
+                        <span class="option-text">${option}</span>
+                    </div>
+                `).join('');
+                
+                // Resetar status de respostas dos jogadores
+                const answersGrid = document.getElementById('answers-grid');
+                if (answersGrid) {
+                    const playerAnswers = answersGrid.querySelectorAll('.player-answer');
+                    playerAnswers.forEach(element => {
+                        element.querySelector('.answer-status').innerHTML = 
+                            '<i class="fas fa-clock text-warning"></i>';
+                        element.classList.remove('correct', 'wrong');
+                    });
+                }
+            }
+        }
+    });
+    
+    socket.on('player_answered', function(data) {
+        console.log('Jogador respondeu:', data.player_name);
+        
+        // Atualizar status de resposta no trivia
+        if (currentGame === 'trivia') {
+            const playerElement = document.querySelector(`.player-answer[data-player-id="${data.player_id}"]`);
+            
+            if (playerElement) {
+                playerElement.querySelector('.answer-status').innerHTML = 
+                    '<i class="fas fa-check-circle text-success"></i>';
+            }
+        }
+    });
+    
+    socket.on('round_results', function(data) {
+        console.log('Resultados da rodada:', data);
+        
+        // Mostrar resultados no trivia
+        if (currentGame === 'trivia') {
+            showRoundResults(data);
+            
+            // Aguardar um pouco antes de passar para a próxima pergunta
+            setTimeout(() => {
+                const options = document.querySelectorAll('.option');
+                options.forEach(option => {
+                    option.classList.remove('correct', 'wrong');
+                });
+                
+                const playerAnswers = document.querySelectorAll('.player-answer');
+                playerAnswers.forEach(element => {
+                    element.classList.remove('correct', 'wrong');
+                });
+            }, 5000);
+        }
+    });
+    
+    socket.on('draw_update', function(data) {
+        console.log('Atualização de desenho:', data);
+        updateDrawing(data);
+    });
+    
+    socket.on('clear_canvas', function() {
+        console.log('Canvas limpo');
+        updateDrawing({ clear: true });
+    });
+    
+    socket.on('guess', function(data) {
+        console.log('Adivinhação:', data);
+        processGuess(data);
+    });
+    
+    socket.on('correct_guess', function(data) {
+        console.log('Adivinhação correta:', data);
+        processGuess({ ...data, correct: true });
+    });
+    
+    socket.on('game_over', function(data) {
+        console.log('Fim do jogo:', data);
+        showGameOver(data);
+    });
+    
+    socket.on('game_ended', function() {
+        console.log('Jogo encerrado pelo líder');
+        gameInProgress = false;
+        currentGame = '';
+        
+        // Voltar para a tela de espera
+        waitingScreen.classList.remove('d-none');
+        gameScreen.classList.add('d-none');
+        
+        // Atualizar status
+        gameSelectionStatus.innerHTML = `
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+            <p>Aguardando o líder selecionar um jogo...</p>
+        `;
+    });
+</script>
+{% endblock %}

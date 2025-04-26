@@ -1,0 +1,38 @@
+sistema-jogos/
+├─ app/
+│  ├─ static/
+│  │  ├─ css/
+│  │  ├─ js/
+│  │  │  ├─ common/          # Código compartilhado
+│  │  │  ├─ games/           # Implementações dos jogos
+│  │  │  ├─ tv/              # Scripts para a interface da TV
+│  │  │  └─ mobile/          # Scripts para a interface do celular
+│  │  └─ images/
+│  ├─ templates/
+│  │  ├─ index.html          # Página inicial
+│  │  ├─ create_room.html    # Criar uma sala
+│  │  ├─ join_room.html      # Entrar em uma sala
+│  │  ├─ tv_display.html     # Interface para TV
+│  │  └─ mobile_control.html # Interface para celular
+│  ├─ games/                 # Módulos Python para lógica dos jogos
+│  │  ├─ __init__.py
+│  │  ├─ game_base.py        # Classe base para todos os jogos
+│  │  ├─ game1.py            # Implementação de um jogo específico
+│  │  └─ game2.py            # Implementação de outro jogo
+│  ├─ models/
+│  │  ├─ __init__.py
+│  │  ├─ room.py             # Modelo para salas de jogo
+│  │  └─ player.py           # Modelo para jogadores
+│  ├─ routes/
+│  │  ├─ __init__.py
+│  │  ├─ main_routes.py      # Rotas para a navegação principal
+│  │  ├─ tv_routes.py        # Rotas específicas para TV
+│  │  └─ mobile_routes.py    # Rotas específicas para celular
+│  ├─ socket_events/         # Handlers para eventos WebSocket
+│  │  ├─ __init__.py
+│  │  └─ game_events.py
+│  └─ utils/                 # Funções utilitárias
+│     ├─ __init__.py
+│     └─ room_code.py        # Geração de códigos de sala
+├─ run.py                    # Script para iniciar a aplicação
+└─ requirements.txt          # Dependências do projeto

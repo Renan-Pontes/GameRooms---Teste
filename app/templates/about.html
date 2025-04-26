@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Sobre - Jogo na TV{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h2 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Sobre o Jogo na TV
+                </h2>
+            </div>
+            <div class="card-body">
+                <div class="about-section">
+                    <h3>O que é o Jogo na TV?</h3>
+                    <p>
+                        Jogo na TV é uma plataforma que transforma qualquer televisão em um console de jogos sociais, permitindo que você e seus amigos joguem diversos jogos usando seus smartphones como controles. Nossa missão é proporcionar momentos divertidos e interativos para grupos de amigos e famílias.
+                    </p>
+                </div>
+                
+                <hr>
+                
+                <div class="about-section">
+                    <h3>Como Funciona?</h3>
+                    <p>
+                        O sistema usa tecnologia de comunicação em tempo real para conectar seus smartphones à TV. Você cria uma sala virtual, seus amigos se juntam usando um código simples, e todos podem participar instantaneamente de jogos interativos.
+                    </p>
+                    <p>
+                        Não é necessário instalar nenhum aplicativo - tudo funciona diretamente no navegador, seja na TV ou no smartphone.
+                    </p>
+                </div>
+                
+                <hr>
+                
+                <div class="about-section">
+                    <h3>Tecnologias Utilizadas</h3>
+                    <ul>
+                        <li><strong>Backend:</strong> Python com Flask</li>
+                        <li><strong>Comunicação em Tempo Real:</strong> Socket.IO</li>
+                        <li><strong>Frontend:</strong> HTML5, CSS3, JavaScript</li>
+                        <li><strong>Design:</strong> Bootstrap 5</li>
+                    </ul>
+                </div>
+                
+                <hr>
+                
+                <div class="about-section">
+                    <h3>Desenvolvido por</h3>
+                    <p>
+                        Este projeto foi desenvolvido como parte de um estudo sobre aplicações web em tempo real e interações entre dispositivos.
+                    </p>
+                    <p>
+                        &copy; 2025 Jogo na TV - Todos os direitos reservados.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

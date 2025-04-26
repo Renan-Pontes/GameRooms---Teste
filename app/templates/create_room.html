@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Criar Nova Sala - Jogo na TV{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h2 class="card-title mb-0">
+                    <i class="fas fa-plus-circle me-2"></i>Criar Nova Sala
+                </h2>
+            </div>
+            <div class="card-body">
+                <p class="card-text">
+                    Crie uma nova sala de jogos e compartilhe o código com seus amigos para que eles possam se juntar a você!
+                </p>
+                
+                <form method="POST" action="{{ url_for('main.create_room') }}">
+                    <div class="mb-3">
+                        <label for="player_name" class="form-label">Seu Nome</label>
+                        <input type="text" class="form-control" id="player_name" name="player_name" required maxlength="20" placeholder="Como você quer ser chamado?">
+                        <div class="form-text">Este nome será exibido para os outros jogadores.</div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-play me-2"></i>Criar e Entrar
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer">
+                <p class="mb-0">
+                    Já tem o código de uma sala? <a href="{{ url_for('main.join_room') }}">Entrar em uma sala existente</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
