@@ -367,3 +367,21 @@
     font-weight: 700;
     color: var(--success-color);
 }
+
+/* Estilos para jogadores desconectados */
+.player-card.disconnected {
+    opacity: 0.5;
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+}
+
+.player-card .disconnect-badge {
+    background-color: #dc3545;
+    color: white;
+    border-radius: 4px;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
+    display: inline-block;
+}
+

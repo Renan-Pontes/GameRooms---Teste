@@ -14,6 +14,13 @@
     <div class="room-info">
         <h2>Sala: {{ room.code }}</h2>
         <p>Jogador: {{ player_name }}</p>
+        
+        <!-- Botão para trocar de nickname -->
+        <div class="nickname-section mt-2">
+            <button id="change-nickname-btn" class="btn btn-sm btn-outline-light">
+                <i class="fas fa-edit me-2"></i>Trocar Nickname
+            </button>
+        </div>
     </div>
     
     <!-- Código para TV -->
@@ -69,6 +76,31 @@
         </a>
     </div>
 </div>
+
+<!-- Modal para trocar de nickname -->
+<div class="modal fade" id="change-nickname-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Trocar Nickname</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="change-nickname-form">
+                    <div class="mb-3">
+                        <label for="new-nickname" class="form-label">Novo Nickname</label>
+                        <input type="text" class="form-control" id="new-nickname" required maxlength="20" placeholder="Digite seu novo nickname">
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Salvar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -91,7 +123,7 @@
     {% endif %}
     
     // Atualizar a lista de jogadores
-    function updatePlayersList(players, hostId) {
+    function updatePlayersList(players, hostId, disconnectedPlayers = []) {
         playersList.innerHTML = '';
         
         Object.entries(players).forEach(([id, name]) => {
@@ -106,11 +138,16 @@
                 playerItem.classList.add('current-player');
             }
             
+            if (disconnectedPlayers.includes(id)) {
+                playerItem.classList.add('disconnected');
+            }
+            
             playerItem.innerHTML = `
                 <div class="player-avatar">${name.charAt(0).toUpperCase()}</div>
                 <div class="player-name">${name}</div>
                 ${id === hostId ? '<div class="host-tag">Líder</div>' : ''}
                 ${id === playerId ? '<div class="you-tag">Você</div>' : ''}
+                ${disconnectedPlayers.includes(id) ? '<div class="disconnect-indicator"><i class="fas fa-plug"></i>Desconectado</div>' : ''}
             `;
             
             playersList.appendChild(playerItem);
@@ -337,6 +374,38 @@
         // ...
     }
     
+    // Modal para trocar de nickname
+    const changeNicknameBtn = document.getElementById('change-nickname-btn');
+    const changeNicknameModal = new bootstrap.Modal(document.getElementById('change-nickname-modal'));
+    const changeNicknameForm = document.getElementById('change-nickname-form');
+
+    // Abrir o modal ao clicar no botão
+    changeNicknameBtn.addEventListener('click', function() {
+        changeNicknameModal.show();
+    });
+
+    // Enviar o formulário para trocar de nickname
+    changeNicknameForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const newNickname = document.getElementById('new-nickname').value.trim();
+        
+        if (newNickname) {
+            // Enviar evento para o servidor
+            socket.emit('update_nickname', {
+                room_code: roomCode,
+                player_id: playerId,
+                new_nickname: newNickname
+            });
+            
+            // Fechar o modal
+            changeNicknameModal.hide();
+            
+            // Limpar o campo
+            document.getElementById('new-nickname').value = '';
+        }
+    });
+    
     // Socket.IO event listeners
     socket.on('connect', function() {
         console.log('Conectado ao servidor');
@@ -359,12 +428,34 @@
     
     socket.on('player_joined', function(data) {
         console.log('Jogador entrou:', data.player_name);
-        updatePlayersList(data.players, data.host_id);
+        updatePlayersList(data.players, data.host_id, data.disconnected_players || []);
     });
     
     socket.on('player_left', function(data) {
         console.log('Jogador saiu');
         updatePlayersList(data.players, data.new_host_id || "{{ room.host_id }}");
+    });
+    
+    socket.on('player_disconnected', function(data) {
+        console.log('Jogador desconectado:', data.player_name);
+        updatePlayersList(data.players, data.host_id, data.disconnected_players || []);
+    });
+    
+    socket.on('player_rejoined', function(data) {
+        console.log('Jogador reconectado:', data.player_name);
+        updatePlayersList(data.players, data.host_id, data.disconnected_players || []);
+    });
+    
+    socket.on('nickname_updated', function(data) {
+        console.log('Nickname atualizado:', data);
+        
+        // Atualizar o nickname na interface
+        if (data.player_id === playerId) {
+            document.querySelector('.room-info p').textContent = `Jogador: ${data.new_nickname}`;
+        }
+        
+        // Atualizar a lista de jogadores
+        updatePlayersList(data.players, data.host_id);
     });
     
     socket.on('game_selected', function(data) {

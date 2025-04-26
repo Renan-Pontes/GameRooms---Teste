@@ -68,7 +68,7 @@
     const gameSelectionStatus = document.getElementById('game-selection-status');
     
     // Atualizar a grade de jogadores
-    function updatePlayersGrid(players) {
+    function updatePlayersGrid(players, hostId, disconnectedPlayers = []) {
         playersGrid.innerHTML = '';
         
         Object.entries(players).forEach(([id, name]) => {
@@ -76,15 +76,21 @@
             playerCard.className = 'player-card';
             playerCard.setAttribute('data-player-id', id);
             
-            const isHost = id === "{{ room.host_id }}";
+            const isHost = id === hostId;
             if (isHost) {
                 playerCard.classList.add('host');
+            }
+            
+            if (disconnectedPlayers.includes(id)) {
+                playerCard.classList.add('disconnected');
             }
             
             playerCard.innerHTML = `
                 <div class="avatar">${name.charAt(0).toUpperCase()}</div>
                 <div class="player-name">${name}</div>
                 ${isHost ? '<div class="host-badge">Líder</div>' : ''}
+                ${disconnectedPlayers.includes(id) ? '<div class="disconnect-badge">Desconectado</div>' : ''}
+                <div class="player-score" style="display: none;">0 pts</div>
             `;
             
             playersGrid.appendChild(playerCard);
@@ -261,13 +267,10 @@
             if (playerCard) {
                 let scoreElement = playerCard.querySelector('.player-score');
                 
-                if (!scoreElement) {
-                    scoreElement = document.createElement('div');
-                    scoreElement.className = 'player-score';
-                    playerCard.appendChild(scoreElement);
+                if (scoreElement) {
+                    scoreElement.textContent = `${score} pts`;
+                    scoreElement.style.display = 'block';
                 }
-                
-                scoreElement.textContent = `${score} pts`;
             }
         });
     }
@@ -347,8 +350,8 @@
                     <div class="winners-list">
                         ${data.winners.map(playerId => `
                             <div class="winner">
-                                <div class="avatar">${room.players[playerId].charAt(0).toUpperCase()}</div>
-                                <div class="player-name">${room.players[playerId]}</div>
+                                <div class="avatar">${"{{ room.players }}".charAt(0).toUpperCase()}</div>
+                                <div class="player-name">${"{{ room.players }}"}</div>
                             </div>
                         `).join('')}
                     </div>
@@ -361,7 +364,7 @@
                             .sort(([, a], [, b]) => b - a)
                             .map(([playerId, score]) => `
                                 <div class="score-item ${data.winners.includes(playerId) ? 'winner' : ''}">
-                                    <span class="player-name">${room.players[playerId]}</span>
+                                    <span class="player-name">${"{{ room.players }}"}</span>
                                     <span class="score">${score} pts</span>
                                 </div>
                             `).join('')}
@@ -380,17 +383,17 @@
         console.log('Conectado ao servidor');
         
         // Inicializar a lista de jogadores
-        updatePlayersGrid({{ room.players|tojson }});
+        updatePlayersGrid({{ room.players|tojson }}, "{{ room.host_id }}");
     });
     
     socket.on('player_joined', function(data) {
         console.log('Jogador entrou:', data.player_name);
-        updatePlayersGrid(data.players);
+        updatePlayersGrid(data.players, data.host_id, data.disconnected_players || []);
     });
 
     socket.on('player_left', function(data) {
         console.log('Jogador saiu');
-        updatePlayersGrid(data.players);
+        updatePlayersGrid(data.players, data.new_host_id || "{{ room.host_id }}");
         
         // Se o host mudou, mostrar mensagem
         if (data.host_changed && data.new_host_id) {
@@ -402,6 +405,21 @@
                 </div>
             `;
         }
+    });
+    
+    socket.on('player_disconnected', function(data) {
+        console.log('Jogador desconectado:', data.player_name);
+        updatePlayersGrid(data.players, data.host_id, data.disconnected_players || []);
+    });
+
+    socket.on('player_rejoined', function(data) {
+        console.log('Jogador reconectado:', data.player_name);
+        updatePlayersGrid(data.players, data.host_id, data.disconnected_players || []);
+    });
+
+    socket.on('nickname_updated', function(data) {
+        console.log('Nickname atualizado:', data.new_nickname);
+        updatePlayersGrid(data.players, data.host_id);
     });
     
     socket.on('game_selected', function(data) {
